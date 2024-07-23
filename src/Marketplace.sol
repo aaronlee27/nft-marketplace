@@ -102,10 +102,40 @@ contract Marketplace is Ownable {
     }
 
     function buyOrder(
-        address _nft
+        address _nft,
+        uint256 _tokenId,
+        address _token,
+        uint256 _price,
+        uint256 _expired
+    )   external payable
+        returns (uint256 orderId)
+    {
+        if (block.timestamp >= _expired) {
+            revert MarketPlaceInvalidOrder();
+        }
+        Order memory order = Order(
+            OrderType.BUY,
+            msg.sender,
+            _nft,
+            _tokenId,
+            _token,
+            _price,
+            _expired,
+            true
+        );
 
-    ) external {
+        orderId = s_orderId;
+        orders[orderId] = order;
+        s_orderId++;
 
+        if (_token == ETH) {
+            if (msg.value < _price) {
+                revert MarketplaceInsufficentAmount();
+            }
+        }
+        else {
+            IERC20(_token).safeTransferFrom(msg.sender, address(this), _price);
+        }
     }
 
     function cancelOrder(
@@ -118,8 +148,22 @@ contract Marketplace is Ownable {
         if (msg.sender != order.proposer){
             revert MarketPlaceUserNotPermitted(msg.sender, _orderId);
         }
-
         order.available = false;
+
+        if (order.orderType == OrderType.SELL) {
+            IERC721(order.nft).safeTransferFrom(address(this), msg.sender, order.tokenId);
+        }
+
+        else {
+            if (order.token == ETH) {
+                (bool success, ) = msg.sender.call{value: order.price}("");
+                require(success, "Marketplace: ETH transfer failed");
+            }
+            
+            else {
+                IERC20(order.token).safeTransfer(msg.sender, order.price);
+            }
+        }
     }
 
     function fulfillSellOrder(
