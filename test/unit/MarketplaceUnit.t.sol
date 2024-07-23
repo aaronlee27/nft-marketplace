@@ -186,6 +186,13 @@ contract MarketplaceUnitTest is Test {
         marketplace.cancelOrder(orderId);
 
         vm.stopPrank();
+
+        // Assertion
+        // 1. NFt owner change to player[0]
+        // 2. order mapping change
+
+        assert(NFT(nft).ownerOf(tokenId) == players[account]);
+        assert(marketplace.getOrder(orderId).available == false);
     }
 
     function testCantCancelOrderIfCancelledBefore() external {
@@ -230,7 +237,7 @@ contract MarketplaceUnitTest is Test {
 
         uint256 buyer = 1;
 
-        fulfillERC20(buyer, orderId);
+        fulfillSellERC20(buyer, orderId);
 
         vm.startPrank(players[account]);
 
@@ -322,7 +329,7 @@ contract MarketplaceUnitTest is Test {
         vm.stopPrank();
     }
 
-    function testCanFulfillOrderWithERC20() external {
+    function testCanFulfillSellOrderWithERC20() external {
         uint256 account = 0;
         address nft = address(nft1);
         uint256 tokenId = 0;
@@ -358,7 +365,7 @@ contract MarketplaceUnitTest is Test {
         assert(marketplace.getOrder(orderId).available == false);
     }
 
-    function testCanFulfillOrderWithETH() external {
+    function testCanFulfillSellOrderWithETH() external {
         uint256 account = 0;
         address nft = address(nft1);
         uint256 tokenId = 0;
@@ -391,7 +398,7 @@ contract MarketplaceUnitTest is Test {
 
     }
 
-    function testCantFulfillOrderIfNotSendEnoughETH() external {
+    function testCantFulfillSellOrderIfNotSendEnoughETH() external {
          uint256 account = 0;
         address nft = address(nft1);
         uint256 tokenId = 0;
@@ -417,7 +424,7 @@ contract MarketplaceUnitTest is Test {
         vm.stopPrank();
     }
 
-    function testCantFulfillOrderIfOwnerOrder() external {
+    function testCantFulfillSellOrderIfOwnerOrder() external {
         uint256 account = 0;
         address nft = address(nft1);
         uint256 tokenId = 0;
@@ -446,7 +453,7 @@ contract MarketplaceUnitTest is Test {
         vm.stopPrank();
     }
 
-    function testCantFulfillOrderIfOrderExpired() external {
+    function testCantFulfillSellOrderIfOrderExpired() external {
         uint256 account = 0;
         address nft = address(nft1);
         uint256 tokenId = 0;
@@ -474,7 +481,7 @@ contract MarketplaceUnitTest is Test {
         vm.stopPrank();
     }
 
-    function testCantFulfillOrderIfOrderCancelled() external {
+    function testCantFulfillSellOrderIfOrderCancelled() external {
         uint256 account = 0;
         address nft = address(nft1);
         uint256 tokenId = 0;
@@ -502,7 +509,7 @@ contract MarketplaceUnitTest is Test {
         vm.stopPrank();
     }
 
-    function testCantFulfillOrderIfOrderFulfilled() external {
+    function testCantFulfillSellOrderIfOrderFulfilled() external {
         uint256 account = 0;
         address nft = address(nft1);
         uint256 tokenId = 0;
@@ -535,7 +542,7 @@ contract MarketplaceUnitTest is Test {
         vm.stopPrank();
     }
 
-    function fulfillERC20(uint256 account, uint256 orderId) internal {
+    function fulfillSellERC20(uint256 account, uint256 orderId) internal {
         vm.startPrank(players[account]);
 
         Token(marketplace.getOrder(orderId).token).approve(address(marketplace), marketplace.getOrder(orderId).price);
@@ -545,7 +552,15 @@ contract MarketplaceUnitTest is Test {
         vm.stopPrank();
     }
 
-    
+    function fulfillSellETH(uint256 account, uint256 orderId) internal {
+        vm.startPrank(players[account]);
+
+        marketplace.fulfillSellOrder{value: marketplace.getOrder(orderId).price}(orderId);
+
+        vm.stopPrank();
+    }
+
+
 
 
 
