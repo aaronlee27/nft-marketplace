@@ -128,6 +128,11 @@ contract Marketplace is Ownable {
         checkValidOrder(_orderId) 
     {
         Order storage order = orders[_orderId];
+
+        if (msg.sender == order.proposer){
+            revert MarketPlaceUserNotPermitted(msg.sender, _orderId);
+        }
+
         order.available = false;
 
         if (order.token == ETH) {

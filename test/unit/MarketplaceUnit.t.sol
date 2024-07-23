@@ -219,6 +219,31 @@ contract MarketplaceUnitTest is Test {
     }
 
     function testCantCancelOrderIfOrderFulfilled() external { // test after test fulfill function
+        uint256 account = 0;
+        address nft = address(nft1);
+        uint256 tokenId = 0;
+        address token = address(token1);
+        uint256 price = 276 ether;
+        uint256 expired = block.timestamp + 100 days;
+
+        uint256 orderId = placeOrder(account, nft, tokenId, token, price, expired);
+
+        uint256 buyer = 1;
+
+        fulfillERC20(buyer, orderId);
+
+        vm.startPrank(players[account]);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Marketplace.MarketPlaceOrderNotAvailable.selector,
+                orderId
+            )
+        );
+
+        marketplace.cancelOrder(orderId);
+
+        vm.stopPrank();
     }
 
     function testCantCancelOrderIfOrderExpired() external {
@@ -366,20 +391,158 @@ contract MarketplaceUnitTest is Test {
 
     }
 
-    function testCantFulfillOrderIfNotApproveEnoughERC20() external {
-
-    }
-
     function testCantFulfillOrderIfNotSendEnoughETH() external {
+         uint256 account = 0;
+        address nft = address(nft1);
+        uint256 tokenId = 0;
+        address token = ETH;
+        uint256 price = 276 ether;
+        uint256 expired = block.timestamp + 100 days;
 
+        uint256 orderId = placeOrder(account, nft, tokenId, token, price, expired);
+
+        uint256 buyer = 1;
+
+        
+
+        vm.startPrank(players[buyer]);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Marketplace.MarketplaceInsufficentAmount.selector
+            )
+        );
+        marketplace.fulfillSellOrder{value: price - 1}(orderId);
+
+        vm.stopPrank();
     }
 
     function testCantFulfillOrderIfOwnerOrder() external {
+        uint256 account = 0;
+        address nft = address(nft1);
+        uint256 tokenId = 0;
+        address token = address(token1);
+        uint256 price = 276 ether;
+        uint256 expired = block.timestamp + 100 days;
 
+        uint256 orderId = placeOrder(account, nft, tokenId, token, price, expired);
+
+        uint256 buyer = 0;
+
+        vm.startPrank(players[buyer]);
+        Token(token).approve(address(marketplace), price);
+
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Marketplace.MarketPlaceUserNotPermitted.selector,
+                players[buyer],
+                orderId
+            )
+        );
+
+        marketplace.fulfillSellOrder(orderId);
+
+        vm.stopPrank();
     }
 
     function testCantFulfillOrderIfOrderExpired() external {
+        uint256 account = 0;
+        address nft = address(nft1);
+        uint256 tokenId = 0;
+        address token = address(token1);
+        uint256 price = 276 ether;
+        uint256 expired = block.timestamp + 100 days;
 
+        uint256 orderId = placeOrder(account, nft, tokenId, token, price, expired);
+
+        uint256 buyer = 1;
+
+        vm.startPrank(players[buyer]);
+
+        vm.warp(block.timestamp + 101 days);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Marketplace.MarketPlaceOrderExpired.selector,
+                orderId
+            )
+        );
+
+        marketplace.fulfillSellOrder(orderId);
+
+        vm.stopPrank();
+    }
+
+    function testCantFulfillOrderIfOrderCancelled() external {
+        uint256 account = 0;
+        address nft = address(nft1);
+        uint256 tokenId = 0;
+        address token = address(token1);
+        uint256 price = 276 ether;
+        uint256 expired = block.timestamp + 100 days;
+
+        uint256 orderId = placeOrder(account, nft, tokenId, token, price, expired);
+
+        cancelOrder(account, orderId);
+
+        uint256 buyer = 1;
+
+        vm.startPrank(players[buyer]);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Marketplace.MarketPlaceOrderNotAvailable.selector,
+                orderId
+            )
+        );
+
+        marketplace.fulfillSellOrder(orderId);
+
+        vm.stopPrank();
+    }
+
+    function testCantFulfillOrderIfOrderFulfilled() external {
+        uint256 account = 0;
+        address nft = address(nft1);
+        uint256 tokenId = 0;
+        address token = address(token1);
+        uint256 price = 276 ether;
+        uint256 expired = block.timestamp + 100 days;
+
+        uint256 orderId = placeOrder(account, nft, tokenId, token, price, expired);
+
+        uint256 buyer = 1;
+
+        vm.startPrank(players[buyer]);
+
+        Token(token).approve(address(marketplace), price);
+        marketplace.fulfillSellOrder(orderId);
+
+        vm.stopPrank();
+
+        vm.startPrank(players[buyer]);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Marketplace.MarketPlaceOrderNotAvailable.selector,
+                orderId
+            )
+        );
+
+        marketplace.fulfillSellOrder(orderId);
+
+        vm.stopPrank();
+    }
+
+    function fulfillERC20(uint256 account, uint256 orderId) internal {
+        vm.startPrank(players[account]);
+
+        Token(marketplace.getOrder(orderId).token).approve(address(marketplace), marketplace.getOrder(orderId).price);
+
+        marketplace.fulfillSellOrder(orderId);
+
+        vm.stopPrank();
     }
 
 
