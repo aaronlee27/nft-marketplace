@@ -159,7 +159,7 @@ contract Marketplace is Ownable {
                 (bool success, ) = msg.sender.call{value: order.price}("");
                 require(success, "Marketplace: ETH transfer failed");
             }
-            
+
             else {
                 IERC20(order.token).safeTransfer(msg.sender, order.price);
             }
@@ -198,7 +198,23 @@ contract Marketplace is Ownable {
     )   external 
         checkValidOrder(_orderId)
     {
+        Order storage order = orders[_orderId];
 
+        if (msg.sender == order.proposer){
+            revert MarketPlaceUserNotPermitted(msg.sender, _orderId);
+        }
+
+        order.available = false;
+
+        IERC721(order.nft).safeTransferFrom(msg.sender, order.proposer, order.price);
+
+        if (order.token == ETH) {
+            (bool success, ) = payable(msg.sender).call{value: order.price}("");
+            require(success, "Marketplace: ETH transfer failed");
+        }
+        else {
+            IERC20(order.token).safeTransfer(msg.sender, order.price);
+        }
     }
 
     function collectFee(address token) external onlyOwner {
