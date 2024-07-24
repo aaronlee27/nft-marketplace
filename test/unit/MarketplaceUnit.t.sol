@@ -560,8 +560,338 @@ contract MarketplaceUnitTest is Test {
         vm.stopPrank();
     }
 
+    function testCanBuyOrderWithERC20() external {
+        uint256 account = 0;
+        address _nft = address(nft1);
+        uint256 _tokenId = 1;
+        address _token = address(token1);
+        uint256 _price = 239 ether;
+        uint256 _expired = block.timestamp + 100 days;
+
+        vm.startPrank(players[account]);
+
+        Token(_token).approve(address(marketplace), _price);
+        marketplace.buyOrder(_nft, _tokenId, _token, _price, _expired);
+
+        vm.stopPrank();
+
+        // Assertion
+        // 1. Contract balance of token increase, player decrese
+        // 2. Mapping check
+        // 3. s_orderId equals 1
+
+        assert(Token(_token).balanceOf(address(marketplace)) == _price);   
+        assert(Token(_token).balanceOf(players[account]) == INITIAL_AMOUNT - _price);
+        assert(marketplace.getOrderId() == 1);
+        assert(marketplace.getOrder(0).available == true);
+        assert(marketplace.getOrder(0).orderType == Marketplace.OrderType.BUY);
+        assert(marketplace.getOrder(0).proposer == players[0]);
+        assert(marketplace.getOrder(0).nft == _nft);
+        assert(marketplace.getOrder(0).tokenId == _tokenId);
+        assert(marketplace.getOrder(0).token == _token);
+        assert(marketplace.getOrder(0).price == _price);
+        assert(marketplace.getOrder(0).expired == _expired);
+    }
+
+    function testCanBuyOrderWithETH() external {
+        uint256 account = 0;
+        address _nft = address(nft1);
+        uint256 _tokenId = 1;
+        address _token = ETH;
+        uint256 _price = 239 ether;
+        uint256 _expired = block.timestamp + 100 days;
+
+        vm.startPrank(players[account]);
+
+        marketplace.buyOrder{value: _price}(_nft, _tokenId, _token, _price, _expired);
+
+        vm.stopPrank();
+
+        // Assertion
+        // 1. Contract balance of token increase, player decrese
+        // 2. Mapping check
+        // 3. s_orderId equals 1
+
+        assert(address(marketplace).balance == _price);
+        assert(players[account].balance == INITIAL_AMOUNT - _price);
+        assert(marketplace.getOrderId() == 1);
+        assert(marketplace.getOrder(0).available == true);
+        assert(marketplace.getOrder(0).orderType == Marketplace.OrderType.BUY);
+        assert(marketplace.getOrder(0).proposer == players[0]);
+        assert(marketplace.getOrder(0).nft == _nft);
+        assert(marketplace.getOrder(0).tokenId == _tokenId);
+        assert(marketplace.getOrder(0).token == _token);
+        assert(marketplace.getOrder(0).price == _price);
+        assert(marketplace.getOrder(0).expired == _expired);
+    }
+
+    function testCantBuyOrderIfExpired() external {
+        uint256 account = 0;
+        address _nft = address(nft1);
+        uint256 _tokenId = 1;
+        address _token = address(token1);
+        uint256 _price = 239 ether;
+        uint256 _expired = block.timestamp;
+
+        vm.startPrank(players[account]);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Marketplace.MarketPlaceInvalidOrder.selector
+            )
+        );
+
+        marketplace.buyOrder(_nft, _tokenId, _token, _price, _expired);
+
+        vm.stopPrank();
+    }
+
+    function testCantBuyOrderIfNotEnoughERC20() external {
+        uint256 account = 0;
+        address _nft = address(nft1);
+        uint256 _tokenId = 1;
+        address _token = address(token1);
+        uint256 _price = 239 ether;
+        uint256 _expired = block.timestamp + 100 days;
+
+        vm.startPrank(players[account]);
+
+        vm.expectRevert();
+
+        marketplace.buyOrder(_nft, _tokenId, _token, _price, _expired);
+
+        vm.stopPrank();
+    }
+
+    function testCantBuyOrderIfNotEnoughETH() external {
+        uint256 account = 0;
+        address _nft = address(nft1);
+        uint256 _tokenId = 1;
+        address _token = ETH;
+        uint256 _price = 239 ether;
+        uint256 _expired = block.timestamp + 100 days;
+
+        vm.startPrank(players[account]);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Marketplace.MarketplaceInsufficentAmount.selector
+            )
+        );
+
+        marketplace.buyOrder{value: _price - 1}(_nft, _tokenId, _token, _price, _expired);
+
+        vm.stopPrank();
+    }
+
+    function testCantBuyOrderIfOwnerOfNFT() external {
+        uint256 account = 0;
+        address _nft = address(nft1);
+        uint256 _tokenId = 0;
+        address _token = address(token1);
+        uint256 _price = 239 ether;
+        uint256 _expired = block.timestamp + 100 days;
+
+        vm.startPrank(players[account]);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Marketplace.MarketPlaceInvalidOrder.selector
+            )
+        );
+
+        marketplace.buyOrder(_nft, _tokenId, _token, _price, _expired);
+
+        vm.stopPrank();
+    }
+    function testCanCancelBuyOrderETH() external {
+        uint256 account = 0;
+        address _nft = address(nft1);
+        uint256 _tokenId = 1;
+        address _token = ETH;
+        uint256 _price = 239 ether;
+        uint256 _expired = block.timestamp + 100 days;
+
+        vm.startPrank(players[account]);
+
+        uint256 orderId = marketplace.buyOrder{value: _price}(_nft, _tokenId, _token, _price, _expired);
+        assert(orderId == 0);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 29 days);
+
+        vm.startPrank(players[account]);
+
+        marketplace.cancelOrder(orderId);
+
+        vm.stopPrank();
+
+        // Assert what?
+        // Balance return
+        // Mapping? (not available anymore)
+        
+        assert(address(marketplace).balance == 0);
+        assert(players[account].balance == INITIAL_AMOUNT);
+        assert(marketplace.getOrder(orderId).available == false);
+    }
+
+    function testCanCancelBuyOrderERC20() external {
+        uint256 account = 0;
+        address _nft = address(nft1);
+        uint256 _tokenId = 1;
+        address _token = address(token1);
+        uint256 _price = 239 ether;
+        uint256 _expired = block.timestamp + 100 days;
+
+        vm.startPrank(players[account]);
+
+        Token(_token).approve(address(marketplace), _price);
+
+        uint256 orderId = marketplace.buyOrder(_nft, _tokenId, _token, _price, _expired);
+        assert(orderId == 0);
+        vm.stopPrank();
+
+        vm.warp(block.timestamp + 29 days);
+
+        vm.startPrank(players[account]);
+
+        marketplace.cancelOrder(orderId);
+
+        vm.stopPrank();
+
+        // Assert what?
+        // Balance return
+        // Mapping? (not available anymore)
+        
+        assert(Token(_token).balanceOf(address(marketplace)) == 0);
+        assert(Token(_token).balanceOf(players[account]) == INITIAL_AMOUNT);
+        assert(marketplace.getOrder(orderId).available == false);
+    }
+
+    function buyOrderWithEth(uint256 account, address _nft, uint256 _tokenId, address _token, uint256 _price, uint256 _expired) internal returns (uint256){
+        vm.startPrank(players[account]);
+
+        uint256 orderId = marketplace.buyOrder{value: _price}(_nft, _tokenId, _token, _price, _expired);
+
+        vm.stopPrank();
+
+        return orderId;
+    }
+
+    function buyOrderWithERC20(uint256 account, address _nft, uint256 _tokenId, address _token, uint256 _price, uint256 _expired) internal returns (uint256){
+        vm.startPrank(players[account]);
+
+        Token(_token).approve(address(marketplace), _price);
+
+        uint256 orderId = marketplace.buyOrder(_nft, _tokenId, _token, _price, _expired);
+
+        vm.stopPrank();
+
+        return orderId;
+    }
+
+    function testFulfillBuyOrderEth() external {
+        uint256 account = 0;
+        address _nft = address(nft1);
+        uint256 _tokenId = 1;
+        address _token = ETH;
+        uint256 _price = 239 ether;
+        uint256 _expired = block.timestamp + 100 days;
+
+        uint256 orderId = buyOrderWithEth(account, _nft, _tokenId, _token, _price, _expired);
 
 
+        uint256 seller = 1;
 
 
+        vm.startPrank(players[seller]);
+
+        NFT(_nft).approve(address(marketplace), _tokenId);
+        marketplace.fulfillBuyOrder(orderId);
+
+        vm.stopPrank();
+        
+
+        // Assertion:
+        // NFT belongs to 0
+        // Balance change: player[0], player[1], contract
+        // Order not available anymore
+        // console.log(players[account]);
+        // console.log(players[seller]);   
+        // console.log("ownerOf", NFT(_nft).ownerOf(_tokenId));
+        // console.log("balanceOf", players[account].balance);
+        // console.log("balanceOf", players[seller].balance);
+        // console.log("balanceOf", address(marketplace).balance);
+        // console.log("order", marketplace.getOrder(orderId).available);
+
+
+        assert(NFT(_nft).ownerOf(_tokenId) == players[0]);
+        assert(players[account].balance == INITIAL_AMOUNT - _price);
+        assert(players[seller].balance == INITIAL_AMOUNT + _price);
+        assert(address(marketplace).balance == 0);
+        assert(marketplace.getOrder(orderId).available == false);
+    }
+
+        function testFulfillBuyOrderERC20() external {
+        uint256 account = 0;
+        address _nft = address(nft1);
+        uint256 _tokenId = 1;
+        address _token = address(token1);
+        uint256 _price = 239 ether;
+        uint256 _expired = block.timestamp + 100 days;
+
+        uint256 orderId = buyOrderWithERC20(account, _nft, _tokenId, _token, _price, _expired);
+
+
+        uint256 seller = 1;
+
+
+        vm.startPrank(players[seller]);
+
+        NFT(_nft).approve(address(marketplace), _tokenId);
+        marketplace.fulfillBuyOrder(orderId);
+
+        vm.stopPrank();
+        
+
+        // Assertion:
+        // NFT belongs to 0
+        // Balance change: player[0], player[1], contract
+        // Order not available anymore
+
+        assert(NFT(_nft).ownerOf(_tokenId) == players[0]);
+        assert(Token(_token).balanceOf(players[account]) == INITIAL_AMOUNT - _price);
+        assert(Token(_token).balanceOf(players[seller]) == INITIAL_AMOUNT + _price);
+        assert(Token(_token).balanceOf(address(marketplace)) == 0);
+        assert(marketplace.getOrder(orderId).available == false);
+
+    }
+    /*
+
+    Attack how?
+    1. Expired
+    2. Not enough amount
+    3. Not the owner of the nft. [x]
+    4. Consider can call buyOrder mutliple times. ??
+        - Same order with same price?
+        - Same order with different price?
+    */
+   
+
+   // test cancel buy order
+   /*
+    - Cant if expired [x]
+    - Cant if fulfilled [x]
+    - Cant if cancelled before [x]
+    - Cant if not owner of the order [x]
+    - Can (check assertation)
+
+   */
+
+  /*
+  Test fulfill order
+  - Cant if not nft owner
+  - Cant if cancel, expired, fulfilled before
+  - Can (assertion) (ERC20, eth)
+  */
 }

@@ -113,6 +113,9 @@ contract Marketplace is Ownable {
         if (block.timestamp >= _expired) {
             revert MarketPlaceInvalidOrder();
         }
+        if (IERC721(_nft).ownerOf(_tokenId) == msg.sender) {
+            revert MarketPlaceInvalidOrder();
+        }
         Order memory order = Order(
             OrderType.BUY,
             msg.sender,
@@ -195,7 +198,7 @@ contract Marketplace is Ownable {
 
     function fulfillBuyOrder(
         uint256 _orderId
-    )   external 
+    )   external payable
         checkValidOrder(_orderId)
     {
         Order storage order = orders[_orderId];
@@ -206,7 +209,7 @@ contract Marketplace is Ownable {
 
         order.available = false;
 
-        IERC721(order.nft).safeTransferFrom(msg.sender, order.proposer, order.price);
+        IERC721(order.nft).safeTransferFrom(msg.sender, order.proposer, order.tokenId);
 
         if (order.token == ETH) {
             (bool success, ) = payable(msg.sender).call{value: order.price}("");
